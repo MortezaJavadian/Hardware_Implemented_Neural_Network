@@ -1,104 +1,88 @@
-LIBRARY IEEE;
-USE IEEE.STD_LOGIC_1164.ALL;
-USE IEEE.STD_LOGIC_ARITH.ALL;
-USE IEEE.STD_LOGIC_UNSIGNED.ALL;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
-ENTITY MLP IS
-  PORT (
-    clk       : IN  std_logic;
-    rst       : IN  std_logic;
-    data_in   : IN  std_logic_vector(31 DOWNTO 0);
-    data_out  : OUT std_logic
-    );
-END MLP;
+use work.nn_types_pkg.all;
+use work.model_parameters_pkg.all;
 
-ARCHITECTURE Behavioral OF MLP IS
-    COMPONENT weight_register
-        PORT(
-            clk : IN std_logic;
-            rst : IN std_logic;
-            data : IN std_logic_vector(31 DOWNTO 0);
-            queue : OUT std_logic_vector(31 DOWNTO 0)
-        );
-    END COMPONENT;
-    
-    COMPONENT neuron
-        GENERIC (
-            DATA_WIDTH : natural := 32;
-            WEIGHT_WIDTH : natural := 32
-        );
-        PORT (
-            clk : IN std_logic;
-            rst : IN std_logic;
-            inputs : IN std_logic_vector(31 DOWNTO 0);
-            weights : IN std_logic_vector(31 DOWNTO 0);
-            output : OUT std_logic_vector(31 DOWNTO 0)
-        );
-    END COMPONENT;
-    
-    COMPONENT layer
-        GENERIC (
-            DATA_WIDTH : natural := 32;
-            WEIGHT_WIDTH : natural := 32;
-            NUM_NEURONS : natural := 8
-        );
-        PORT (
-            clk : IN std_logic;
-            rst : IN std_logic;
-            inputs : IN std_logic_vector(255 DOWNTO 0); 
-            weights : IN std_logic_vector(255 DOWNTO 0); 
-            outputs : OUT std_logic_vector(255 DOWNTO 0) 
-        );
-    END COMPONENT;
-    
-    COMPONENT gradient_descent
-        PORT(
-            x : IN std_logic_vector(31 DOWNTO 0);
-            y : IN std_logic_vector(31 DOWNTO 0);
-            clk : IN std_logic;
-            rst : IN std_logic;
-            done : OUT std_logic;
-            weight_out : OUT std_logic_vector(31 DOWNTO 0) -- Updated weight output
-        );
-    END COMPONENT;
-    
-    SIGNAL wr_queue, layer_inputs, layer_outputs, neuron_output, gd_x, gd_y : std_logic_vector(31 DOWNTO 0);
-    SIGNAL weights : std_logic_vector(255 DOWNTO 0);
-    SIGNAL updated_weight : std_logic_vector(31 DOWNTO 0);
-    
-BEGIN
-    wr: weight_register PORT MAP(
-        clk => clk,
-        rst => rst,
-        data => data_in,
-        queue => wr_queue
+entity MLP is
+    port (
+        clk                 : in  std_logic;
+        rst                 : in  std_logic;
+        valid_in            : in  std_logic;
+        data_in             : in  std_logic_vector(31 downto 0);
+        valid_out           : out std_logic;
+        class_out           : out std_logic_vector(1 downto 0);
+        uncertain_out       : out std_logic;
+        confidence_margin_out: out std_logic_vector(SCORE_WIDTH_C - 1 downto 0)
     );
-    
-    n: neuron PORT MAP(
-        clk => clk,
-        rst => rst,
-        inputs => wr_queue,
-        weights => weights(31 DOWNTO 0),
-        output => neuron_output
-    );
-    
-    l: layer PORT MAP(
-        clk => clk,
-        rst => rst,
-        inputs => layer_inputs,
-        weights => weights,
-        outputs => layer_outputs
-    );
-    
-    gd: gradient_descent PORT MAP(
-        x => neuron_output,
-        y => data_in,
-        clk => clk,
-        rst => rst,
-        done => OPEN,
-        weight_out => updated_weight -- Updated weight
-    );
-    
-    data_out <= '1' when neuron_output = data_in else '0'; 
-    
-END Behavioral;
+end entity MLP;
+
+architecture Behavioral of MLP is
+
+    signal inputs  : feature_vector_t;
+    signal scores  : score_vector_t;
+    signal cls_idx : unsigned(1 downto 0);
+    signal margin  : unsigned(SCORE_WIDTH_C - 1 downto 0);
+    signal margin_slv : std_logic_vector(SCORE_WIDTH_C - 1 downto 0);
+
+    signal valid_r : std_logic;
+    signal class_r : std_logic_vector(1 downto 0);
+    signal marg_r  : std_logic_vector(SCORE_WIDTH_C - 1 downto 0);
+    signal unc_r   : std_logic;
+
+begin
+
+    inputs(0) <= unsigned(data_in(31 downto 24));
+    inputs(1) <= unsigned(data_in(23 downto 16));
+    inputs(2) <= unsigned(data_in(15 downto 8));
+    inputs(3) <= unsigned(data_in(7 downto 0));
+
+    U_LAYER : entity work.layer
+        port map (
+            inputs  => inputs,
+            weights => MODEL_WEIGHTS_C,
+            biases  => MODEL_BIASES_C,
+            scores  => scores
+        );
+
+    U_ARGMAX : entity work.argmax
+        port map (
+            scores            => scores,
+            class_index       => cls_idx,
+            confidence_margin => margin
+        );
+
+    margin_slv <= std_logic_vector(margin);
+
+    process(clk, rst)
+        variable threshold : unsigned(SCORE_WIDTH_C - 1 downto 0);
+    begin
+        if rst = '1' then
+            valid_r <= '0';
+            class_r <= (others => '0');
+            marg_r  <= (others => '0');
+            unc_r   <= '0';
+        elsif rising_edge(clk) then
+            if valid_in = '1' then
+                valid_r <= '1';
+                class_r <= std_logic_vector(cls_idx);
+                marg_r  <= margin_slv;
+                threshold := to_unsigned(UNCERTAINTY_THRESHOLD_C, SCORE_WIDTH_C);
+                if margin < threshold then
+                    unc_r <= '1';
+                else
+                    unc_r <= '0';
+                end if;
+            else
+                valid_r <= '0';
+            end if;
+        end if;
+    end process;
+
+    valid_out    <= valid_r;
+    class_out    <= class_r;
+    confidence_margin_out <= marg_r;
+    uncertain_out <= unc_r;
+
+end architecture Behavioral;

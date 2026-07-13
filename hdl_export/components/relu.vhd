@@ -1,49 +1,25 @@
---------------------------------------------------------------------------------
--- Project :
-Hardware_Implemented_Neural_Network
--- File    :
- 
--- Autor   :
--- Date    :
- 
---
---------------------------------------------------------------------------------
--- Description : This is a ReLU function that takes an 8-bit input vector and 
---               outputs an 8-bit result vector.
---
---------------------------------------------------------------------------------
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
-LIBRARY ieee;
-USE ieee.std_logic_1164.all;
-USE ieee.std_logic_unsigned.all;
-
-ENTITY ReLU IS
-    GENERIC (
-        DATA_WIDTH : natural := 32
+entity ReLU is
+    generic (
+        DATA_WIDTH : positive := 32
     );
-    PORT (
-    ------------------------------------------------------------------------------
-    --Insert input ports below
-        x : IN  std_logic_vector(DATA_WIDTH-1 DOWNTO 0); -- input vector
-    ------------------------------------------------------------------------------
-    --Insert output ports below
-        y : OUT std_logic_vector(DATA_WIDTH-1 DOWNTO 0)  -- output vector
+    port (
+        x : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+        y : out std_logic_vector(DATA_WIDTH - 1 downto 0)
     );
-END ReLU;
+end entity ReLU;
 
---------------------------------------------------------------------------------
--- VHDL Description
---------------------------------------------------------------------------------
-
-ARCHITECTURE Behavioral OF ReLU IS
-BEGIN
-    PROCESS(x)
-    BEGIN
-        -- relu 
-        IF x >= "00000000" THEN
+architecture Behavioral of ReLU is
+begin
+    process(all)
+    begin
+        if signed(x) < 0 then
+            y <= (others => '0');
+        else
             y <= x;
-        ELSE
-            y <= "00000000";
-        END IF;
-    END PROCESS;
-END Behavioral;
+        end if;
+    end process;
+end architecture Behavioral;

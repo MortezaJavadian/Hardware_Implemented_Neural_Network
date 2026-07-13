@@ -1,53 +1,29 @@
---------------------------------------------------------------------------------
--- Project :
-Hardware_Implemented_Neural_Network
--- File    :
- 
--- Autor   :
--- Date    :
---
---------------------------------------------------------------------------------
--- Description :
- 
--- This is a weight register that takes in data and outputs it on the next clock cycle.
---
---------------------------------------------------------------------------------
+library ieee;
+use ieee.std_logic_1164.all;
 
--- The weight_register entity has a clock (clk), reset (rst), data, and queue port. 
--- When the reset port is high, the temp signal is set to all 0's. When the clock 
--- port is high (on the rising edge), the temp signal is set to the data. The queue 
--- port is always equal to the temp signal.
-
-LIBRARY IEEE;
-USE IEEE.std_logic_1164.ALL;
-
-ENTITY weight_register IS
-    GENERIC (
-        DATA_WIDTH : natural := 32
+entity weight_register is
+    generic (
+        DATA_WIDTH : positive := 32
     );
-    PORT (
-        clk : IN std_logic;
-        rst : IN std_logic;
-        data : IN std_logic_vector(DATA_WIDTH-1 DOWNTO 0);
-        output : OUT std_logic_vector(DATA_WIDTH-1 DOWNTO 0)
+    port (
+        clk    : in  std_logic;
+        rst    : in  std_logic;
+        data   : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+        output : out std_logic_vector(DATA_WIDTH - 1 downto 0)
     );
-END weight_register;
+end entity weight_register;
 
-ARCHITECTURE Behavioral OF weight_register IS
+architecture Behavioral of weight_register is
+    signal reg : std_logic_vector(DATA_WIDTH - 1 downto 0);
+begin
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            reg <= (others => '0');
+        elsif rising_edge(clk) then
+            reg <= data;
+        end if;
+    end process;
 
-SIGNAL temp : std_logic_vector(DATA_WIDTH-1 DOWNTO 0);
-    
-BEGIN
-
-process(clk, rst)
-BEGIN
-   IF(rst='1') THEN
-       temp <= (OTHERS => '0');
-   ELSIF(rising_edge(clk)) THEN
-       temp <= data;
-   END IF;
-END PROCESS;
-
-output <= temp;
-    
-END Behavioral;
+    output <= reg;
+end architecture Behavioral;

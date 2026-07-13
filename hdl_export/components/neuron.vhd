@@ -1,62 +1,29 @@
---------------------------------------------------------------------------------
--- Project :
-Hardware_Implemented_Neural_Network
--- File    :
- 
--- Autor   :
--- Date    :
- 
---
---------------------------------------------------------------------------------
--- Description :
- 
--- This is a neuron entity that computes the weighted sum of its inputs and applies the ReLU activation function.
---
---------------------------------------------------------------------------------
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
-LIBRARY IEEE;
-USE IEEE.std_logic_1164.ALL;
-USE IEEE.std_logic_unsigned.ALL;
+use work.nn_types_pkg.all;
 
-ENTITY neuron IS
-    GENERIC (
-        DATA_WIDTH : natural := 32;
-        WEIGHT_WIDTH : natural := 32
+entity neuron is
+    port (
+        inputs  : in  feature_vector_t;
+        weights : in  class_weight_vector_t;
+        bias    : in  score_t;
+        score   : out score_t
     );
-    PORT (
-        clk : IN std_logic;
-        rst : IN std_logic;
-        inputs : IN std_logic_vector(DATA_WIDTH-1 DOWNTO 0);
-        weights : IN std_logic_vector(WEIGHT_WIDTH-1 DOWNTO 0);
-        output : OUT std_logic_vector(DATA_WIDTH-1 DOWNTO 0)
-    );
-END neuron;
+end entity neuron;
 
-ARCHITECTURE Behavioral OF neuron IS
-    COMPONENT ReLU
-        PORT (
-            x : IN std_logic_vector(DATA_WIDTH-1 DOWNTO 0);
-            y : OUT std_logic_vector(DATA_WIDTH-1 DOWNTO 0)
-        );
-    END COMPONENT;
-
-    SIGNAL weighted_sum : std_logic_vector(DATA_WIDTH-1 DOWNTO 0);
-
-BEGIN
-
-    PROCESS(clk, rst)
-    BEGIN
-        IF(rst='1') THEN
-            weighted_sum <= (OTHERS => '0');
-        ELSIF (rising_edge(clk)) THEN
-            weighted_sum <= inputs * weights;
-        END IF;
-    END PROCESS;
-
-    relu_inst : ReLU
-        PORT MAP (
-            x => weighted_sum,
-            y => output
-        );
-
-END Behavioral;
+architecture comb of neuron is
+begin
+    process(inputs, weights, bias)
+        variable product_wide : signed(FEATURE_WIDTH_C + WEIGHT_WIDTH_C downto 0);
+        variable accum        : score_t;
+    begin
+        accum := bias;
+        for i in 0 to NUM_FEATURES_C - 1 loop
+            product_wide := signed('0' & inputs(i)) * weights(i);
+            accum := accum + resize(product_wide, SCORE_WIDTH_C);
+        end loop;
+        score <= accum;
+    end process;
+end architecture comb;
