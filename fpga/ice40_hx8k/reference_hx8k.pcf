@@ -1,0 +1,9 @@
+# Reference timing constraint only.
+#
+# No physical board is selected.
+# IO pins are intentionally left unconstrained and will be
+# placed automatically by nextpnr.
+#
+# The generated bitstream MUST NOT be flashed to hardware.
+
+set_frequency clk 12
